@@ -2,23 +2,25 @@
 
 ## Estado seguro de partida
 
-El repositorio puede arrancar en modo demostración sin credenciales. No se ha creado ningún proyecto Supabase ni se ha aplicado la migración al proyecto existente `cumkjqkknicjrnvwejgk`.
+El repositorio puede arrancar en modo demostración sin credenciales. No se ha creado ningún proyecto Supabase: se reutiliza exclusivamente `cumkjqkknicjrnvwejgk`. La migración base `20260807010418` y la migración de índices `20260807174818` se aplicaron, registraron y verificaron el 7 de agosto de 2026. Google Auth, las membresías reales, el calendario compartido y el worker siguen sin activar.
 
-Antes de conectar producción:
+La preparación de base de datos ya completó estos controles:
 
 1. ejecutar `supabase/audit/00_preflight_read_only.sql` en el proyecto existente;
 2. comprobar colisiones de objetos, versión PostgreSQL, extensiones, RLS, Auth, Realtime y consumidores actuales;
 3. hacer copia de seguridad y definir rollback;
-4. revisar la migración `supabase/migrations/20260807010418_init_agenda.sql`;
-5. obtener autorización expresa para aplicarla;
+4. revisar las dos migraciones de `supabase/migrations`;
+5. obtener autorización expresa para aplicarlas;
 6. ejecutar `supabase/audit/01_postdeploy_verification.sql` y los advisors de seguridad y rendimiento después de aplicarla;
-7. probar concurrencia y RLS con usuarios reales, nunca solo como `postgres` o con clave secreta.
+7. probar transaccionalmente concurrencia, ocupación de salas y RLS con el rol `authenticated`.
+
+Antes de abrir el acceso al equipo aún deben configurarse Google Auth, el primer coordinador, los profesionales autorizados, el calendario y sus secretos; después se repetirá la prueba E2E con identidades reales.
 
 Todos los objetos de esta aplicación usan el prefijo `agenda_` y las funciones privilegiadas viven en `muvvital_agenda_private` para reducir el riesgo de colisión dentro del proyecto compartido.
 
 ## Alta inicial
 
-Después de una migración autorizada, el primer coordinador se preautoriza desde SQL. Sustituir el email y nombre por datos reales:
+Con el esquema ya desplegado, el primer coordinador se preautoriza desde SQL. Sustituir el email y nombre por datos reales:
 
 ```sql
 insert into public.agenda_member_invitations (

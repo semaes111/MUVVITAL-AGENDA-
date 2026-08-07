@@ -12,9 +12,9 @@
 | Revisión verificada | `main` en `70b2d64cfbdb0b64b9e75e2003a7f38401d04df1` |
 | Restricción principal | No modificar, ramificar, desplegar ni añadir archivos a `MUVITAL-WEB` |
 | Restricción Supabase | Prohibido crear proyectos nuevos; solo podría reutilizarse un proyecto existente que el propietario designe y autorice expresamente |
-| Proyecto Supabase designado | `cumkjqkknicjrnvwejgk` (`https://cumkjqkknicjrnvwejgk.supabase.co`), pendiente de auditoría y autorización técnica |
+| Proyecto Supabase designado | `cumkjqkknicjrnvwejgk` (`https://cumkjqkknicjrnvwejgk.supabase.co`), auditado y con el esquema de agenda aplicado el 2026-08-07 |
 | Repositorio de implementación | `semaes111/MUVVITAL-AGENDA-`, rama de trabajo independiente |
-| Estado de validación | Frontend, migración y sincronizador preparados; migración y secretos todavía no aplicados |
+| Estado de validación | Frontend verificado; esquema, RLS e índices aplicados; Google Auth, profesionales, secretos y sincronizador aún no activados |
 
 ### Convención de evidencia
 
@@ -29,7 +29,7 @@ La solución debe ser una aplicación independiente, en un repositorio nuevo y p
 
 - frontend React + TypeScript + Vite + Tailwind, coherente con la web actual;
 - SPA estática servida por Nginx en un contenedor gestionado por Dokploy;
-- el proyecto Supabase existente `cumkjqkknicjrnvwejgk`, ya identificado por el propietario y pendiente de auditoría/autorización antes de cualquier cambio, para Google Login, PostgreSQL, RLS y Realtime;
+- el proyecto Supabase existente `cumkjqkknicjrnvwejgk`, auditado y autorizado para el esquema de agenda, para Google Login, PostgreSQL, RLS y Realtime;
 - PostgreSQL como única fuente de verdad de disponibilidad y exclusión de salas;
 - dos unidades reservables: la suite indivisible **Consulta + Exploración** y la sala **Podología**;
 - Google Calendar compartido como espejo de solo lectura para los profesionales;
@@ -38,7 +38,7 @@ La solución debe ser una aplicación independiente, en un repositorio nuevo y p
 
 No se recomienda una sincronización bidireccional inicial. Permitir editar reservas desde Google Calendar saltaría las reglas de exclusividad de las salas y crearía dos fuentes de verdad.
 
-Esta arquitectura **no autoriza a crear ningún proyecto Supabase ni a modificar todavía el proyecto identificado**. El endpoint aportado permite fijar el destino lógico, pero no acredita por sí solo su compatibilidad, sus credenciales ni permiso para aplicar migraciones. Antes de utilizarlo habrá que inventariar su esquema, Auth, extensiones, políticas y consumidores actuales mediante una revisión de solo lectura expresamente autorizada. Si no resulta adecuado, la alternativa deberá rediseñarse sobre PostgreSQL/Auth en el VPS, sin crear Supabase por defecto.
+No se ha creado ningún proyecto Supabase. El proyecto identificado se inventarió mediante una revisión de solo lectura y recibió autorización para aplicar exclusivamente el esquema `agenda_*`; la migración base y la migración de índices quedaron registradas y verificadas el 2026-08-07. Cualquier cambio adicional en Auth, secretos o integraciones sigue requiriendo autorización y sus credenciales específicas.
 
 ```mermaid
 flowchart TB
@@ -540,9 +540,9 @@ Antes de activar producción deben cerrarse estos parámetros operativos y técn
 1. qué horas computan como mañana y como tarde;
 2. horizonte de generación de series: curso, año natural o ventana móvil;
 3. confirmar o cambiar los valores iniciales de granularidad (15 minutos) y duración mínima (30 minutos);
-4. auditoría de solo lectura del proyecto identificado y autorización separada para cualquier migración, configuración de Auth o secreto.
+4. email y nombre del primer coordinador, lista de profesionales y credenciales para Google Auth y el calendario compartido.
 
-La URL aportada identifica el proyecto, pero no equivale a credenciales ni a permiso para modificarlo.
+El esquema ya está desplegado; la activación para usuarios reales continúa bloqueada hasta configurar identidad y membresías.
 
 ## 15. Qué hacer y qué no hacer
 
