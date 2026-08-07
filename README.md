@@ -22,7 +22,7 @@ No se almacenan pacientes, diagnósticos, tratamientos, teléfonos ni notas clí
 
 ## Estado de integración
 
-El código y la migración están preparados, pero **la migración no se ha aplicado** al proyecto Supabase existente `cumkjqkknicjrnvwejgk`. Antes se exige auditoría de solo lectura y autorización separada. Este repositorio no crea proyectos Supabase.
+El esquema base y los índices de claves foráneas se aplicaron y verificaron el **7 de agosto de 2026** en el proyecto Supabase existente `cumkjqkknicjrnvwejgk`, tras la auditoría y autorización correspondientes. Este repositorio no crea proyectos Supabase. Google Login, la lista inicial de profesionales y la sincronización con Google Calendar siguen pendientes de credenciales y datos del propietario.
 
 ## Desarrollo local
 
@@ -72,7 +72,8 @@ El esquema incluye series y renuncias de cobertura, pero la asignación de maña
 
 - [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md): blueprint consolidado y decisiones.
 - [`docs/OPERACION_Y_DESPLIEGUE.md`](docs/OPERACION_Y_DESPLIEGUE.md): Supabase, Google Calendar y Dokploy.
-- [`supabase/migrations/20260807010418_init_agenda.sql`](supabase/migrations/20260807010418_init_agenda.sql): esquema versionado, todavía no aplicado.
+- [`supabase/migrations/20260807010418_init_agenda.sql`](supabase/migrations/20260807010418_init_agenda.sql): esquema base aplicado.
+- [`supabase/migrations/20260807174818_add_agenda_foreign_key_indexes.sql`](supabase/migrations/20260807174818_add_agenda_foreign_key_indexes.sql): índices de claves foráneas aplicados.
 - [`supabase/audit/00_preflight_read_only.sql`](supabase/audit/00_preflight_read_only.sql): comprobación sin escrituras previa al despliegue.
 - [`supabase/audit/01_postdeploy_verification.sql`](supabase/audit/01_postdeploy_verification.sql): verificación sin escrituras posterior al despliegue.
 

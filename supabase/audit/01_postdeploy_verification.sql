@@ -69,6 +69,41 @@ where publication.pubname = 'supabase_realtime'
   and publication.schemaname = 'public'
   and publication.tablename = 'agenda_bookings';
 
+-- Debe devolver cero filas. Replica el criterio de prefijo de columnas del
+-- lint 0001_unindexed_foreign_keys de Supabase.
+with foreign_keys as (
+  select
+    classes.oid as table_oid,
+    classes.relname as table_name,
+    constraints.conname as constraint_name,
+    constraints.conkey as column_numbers
+  from pg_constraint as constraints
+  join pg_class as classes on classes.oid = constraints.conrelid
+  join pg_namespace as namespace on namespace.oid = classes.relnamespace
+  where constraints.contype = 'f'
+    and namespace.nspname = 'public'
+    and classes.relname like 'agenda\_%' escape '\'
+), valid_indexes as (
+  select
+    indexes.indrelid as table_oid,
+    string_to_array(indexes.indkey::text, ' ')::smallint[] as column_numbers
+  from pg_index as indexes
+  where indexes.indisvalid
+)
+select
+  foreign_keys.table_name,
+  foreign_keys.constraint_name
+from foreign_keys
+where not exists (
+  select 1
+  from valid_indexes
+  where valid_indexes.table_oid = foreign_keys.table_oid
+    and foreign_keys.column_numbers = valid_indexes.column_numbers[
+      1:array_length(foreign_keys.column_numbers, 1)
+    ]
+)
+order by foreign_keys.table_name, foreign_keys.constraint_name;
+
 select
   (select count(*) from public.agenda_organizations) as organizations,
   (select count(*) from public.agenda_rooms) as rooms,

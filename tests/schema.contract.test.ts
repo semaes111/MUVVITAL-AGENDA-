@@ -7,6 +7,14 @@ const sql = readFileSync(
   'utf8',
 )
 
+const foreignKeyIndexesSql = readFileSync(
+  join(
+    process.cwd(),
+    'supabase/migrations/20260807174818_add_agenda_foreign_key_indexes.sql',
+  ),
+  'utf8',
+)
+
 describe('contrato de seguridad y concurrencia del esquema', () => {
   it('mantiene las tablas aisladas mediante el prefijo agenda_', () => {
     const createdTables = [...sql.matchAll(/create table public\.([a-z_]+)/g)].map((match) => match[1])
@@ -78,6 +86,23 @@ describe('contrato de seguridad y concurrencia del esquema', () => {
       'grant select, update on table public.agenda_integration_outbox to service_role;',
     )
     expect(sql).not.toMatch(/grant all[^;]+service_role/i)
+  })
+
+  it('cubre las claves foráneas señaladas por el asesor de rendimiento', () => {
+    const indexes = [
+      ...foreignKeyIndexesSql.matchAll(
+        /create index ([a-z_]+)\s+on public\.(agenda_[a-z_]+)\(([^)]+)\);/g,
+      ),
+    ]
+
+    expect(indexes).toHaveLength(22)
+    expect(foreignKeyIndexesSql).toContain(
+      'on public.agenda_bookings(booking_unit_id, organization_id);',
+    )
+    expect(foreignKeyIndexesSql).toContain(
+      'on public.agenda_room_occupancies(room_id, organization_id);',
+    )
+    expect(foreignKeyIndexesSql).not.toContain('concurrently')
   })
 
   it('no incluye secretos ni campos de pacientes', () => {
