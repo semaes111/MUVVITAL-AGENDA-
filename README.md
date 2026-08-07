@@ -73,6 +73,8 @@ El esquema incluye series y renuncias de cobertura, pero la asignación de maña
 - [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md): blueprint consolidado y decisiones.
 - [`docs/OPERACION_Y_DESPLIEGUE.md`](docs/OPERACION_Y_DESPLIEGUE.md): Supabase, Google Calendar y Dokploy.
 - [`supabase/migrations/20260807010418_init_agenda.sql`](supabase/migrations/20260807010418_init_agenda.sql): esquema versionado, todavía no aplicado.
+- [`supabase/audit/00_preflight_read_only.sql`](supabase/audit/00_preflight_read_only.sql): comprobación sin escrituras previa al despliegue.
+- [`supabase/audit/01_postdeploy_verification.sql`](supabase/audit/01_postdeploy_verification.sql): verificación sin escrituras posterior al despliegue.
 
 ## Identidad visual
 

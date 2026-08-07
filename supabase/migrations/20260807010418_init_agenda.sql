@@ -106,8 +106,8 @@ create table public.agenda_members (
   constraint agenda_members_display_name_length check (char_length(display_name) between 2 and 120)
 );
 
-create index agenda_members_user_active_idx
-  on public.agenda_members(user_id, organization_id)
+create unique index agenda_members_one_active_membership_idx
+  on public.agenda_members(user_id)
   where is_active;
 
 create table public.agenda_member_invitations (
@@ -263,7 +263,11 @@ create table public.agenda_integration_outbox (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   foreign key (booking_id, organization_id)
-    references public.agenda_bookings(id, organization_id) on delete restrict
+    references public.agenda_bookings(id, organization_id) on delete restrict,
+  constraint agenda_integration_outbox_lock_consistency check (
+    (status = 'processing' and locked_at is not null)
+    or (status <> 'processing' and locked_at is null)
+  )
 );
 
 create index agenda_integration_outbox_worker_idx
@@ -534,22 +538,21 @@ begin
     raise exception using errcode = '22023', message = 'Los turnos fijos se crean desde coordinación';
   end if;
 
-  select * into member_record
-  from public.agenda_members
-  where user_id = actor_id and is_active
-  order by created_at
-  limit 1;
-  if not found then
-    raise exception using errcode = '42501', message = 'Miembro no autorizado';
-  end if;
-
   select * into unit_record
   from public.agenda_booking_units
   where id = p_booking_unit_id
-    and organization_id = member_record.organization_id
     and is_active;
   if not found then
     raise exception using errcode = '22023', message = 'Unidad de reserva no disponible';
+  end if;
+
+  select * into member_record
+  from public.agenda_members
+  where user_id = actor_id
+    and organization_id = unit_record.organization_id
+    and is_active;
+  if not found then
+    raise exception using errcode = '42501', message = 'Miembro no autorizado';
   end if;
 
   perform muvvital_agenda_private.validate_window(
@@ -910,12 +913,31 @@ begin
     raise exception using errcode = '22023', message = 'El lote debe contener entre 1 y 100 trabajos';
   end if;
 
+  -- Recover work abandoned by a crashed or timed-out Edge Function. The
+  -- worker timeout must remain below this lease duration.
+  update public.agenda_integration_outbox as stale
+  set
+    status = 'failed',
+    attempts = least(stale.attempts + 1, 32767)::smallint,
+    available_at = now(),
+    locked_at = null,
+    last_error = 'Worker lease expired before completion'
+  where stale.status = 'processing'
+    and stale.locked_at < now() - interval '10 minutes';
+
   return query
   with candidates as (
     select outbox.id
     from public.agenda_integration_outbox as outbox
     where outbox.status in ('pending', 'failed')
       and outbox.available_at <= now()
+      and not exists (
+        select 1
+        from public.agenda_integration_outbox as earlier
+        where earlier.booking_id = outbox.booking_id
+          and earlier.id < outbox.id
+          and earlier.status in ('pending', 'processing', 'failed')
+      )
     order by outbox.available_at, outbox.id
     for update skip locked
     limit p_limit

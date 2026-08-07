@@ -1,4 +1,4 @@
-import { createClient } from 'npm:@supabase/supabase-js@2.112.2'
+import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.112.2'
 
 type OutboxJob = {
   id: number
@@ -35,15 +35,24 @@ Deno.serve(async (request) => {
 
     const supabase = createClient(
       required('SUPABASE_URL'),
-      required('SUPABASE_SECRET_KEY'),
+      supabaseSecretKey(),
       { auth: { persistSession: false, autoRefreshToken: false } },
     )
     const calendarId = required('GOOGLE_CALENDAR_ID')
-    const accessToken = await getGoogleAccessToken()
     const { data, error } = await supabase.rpc('agenda_claim_outbox_batch', { p_limit: 20 })
     if (error) throw new Error(`Unable to claim outbox jobs: ${error.code}`)
 
     const jobs = (data ?? []) as OutboxJob[]
+    if (jobs.length === 0) return json({ claimed: 0, completed: 0, failed: 0 })
+
+    let accessToken: string
+    try {
+      accessToken = await getGoogleAccessToken()
+    } catch (caught) {
+      await Promise.all(jobs.map((job) => markJobFailed(supabase, job, caught)))
+      return json({ claimed: jobs.length, completed: 0, failed: jobs.length })
+    }
+
     let completed = 0
     let failed = 0
 
@@ -85,7 +94,7 @@ Deno.serve(async (request) => {
         }
 
         const now = new Date().toISOString()
-        await Promise.all([
+        const [linkUpdate, outboxUpdate] = await Promise.all([
           supabase
             .from('agenda_calendar_event_links')
             .update({
@@ -101,27 +110,11 @@ Deno.serve(async (request) => {
             .update({ status: 'completed', last_error: null, locked_at: null })
             .eq('id', job.id),
         ])
+        assertDatabaseUpdate(linkUpdate.error, 'Calendar link completion failed')
+        assertDatabaseUpdate(outboxUpdate.error, 'Outbox completion failed')
         completed += 1
       } catch (caught) {
-        const message = safeError(caught)
-        const attempts = job.attempts + 1
-        const delayMinutes = Math.min(360, 2 ** Math.min(attempts, 8))
-        await Promise.all([
-          supabase
-            .from('agenda_calendar_event_links')
-            .update({ sync_status: 'failed', last_error: message })
-            .eq('booking_id', job.booking_id),
-          supabase
-            .from('agenda_integration_outbox')
-            .update({
-              status: 'failed',
-              attempts,
-              last_error: message,
-              locked_at: null,
-              available_at: new Date(Date.now() + delayMinutes * 60_000).toISOString(),
-            })
-            .eq('id', job.id),
-        ])
+        await markJobFailed(supabase, job, caught)
         failed += 1
       }
     }
@@ -131,6 +124,66 @@ Deno.serve(async (request) => {
     return json({ error: safeError(caught) }, 500)
   }
 })
+
+function supabaseSecretKey(): string {
+  const bundledKeys = Deno.env.get('SUPABASE_SECRET_KEYS')?.trim()
+  if (bundledKeys) {
+    try {
+      const parsed = JSON.parse(bundledKeys) as Record<string, unknown>
+      const defaultKey = parsed.default
+      if (typeof defaultKey === 'string' && defaultKey.trim()) return defaultKey.trim()
+    } catch {
+      throw new Error('SUPABASE_SECRET_KEYS is not valid JSON')
+    }
+    throw new Error('SUPABASE_SECRET_KEYS does not contain the default key')
+  }
+
+  const explicitKey = Deno.env.get('SUPABASE_SECRET_KEY')?.trim()
+  if (explicitKey) return explicitKey
+
+  const legacyKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim()
+  if (legacyKey) return legacyKey
+
+  throw new Error('Missing required secret: SUPABASE_SECRET_KEYS')
+}
+
+async function markJobFailed(
+  supabase: SupabaseClient,
+  job: OutboxJob,
+  caught: unknown,
+) {
+  const message = safeError(caught)
+  const attempts = job.attempts + 1
+  const delayMinutes = Math.min(360, 2 ** Math.min(attempts, 8))
+  const [linkUpdate, outboxUpdate] = await Promise.all([
+    supabase
+      .from('agenda_calendar_event_links')
+      .update({ sync_status: 'failed', last_error: message })
+      .eq('booking_id', job.booking_id),
+    supabase
+      .from('agenda_integration_outbox')
+      .update({
+        status: 'failed',
+        attempts,
+        last_error: message,
+        locked_at: null,
+        available_at: new Date(Date.now() + delayMinutes * 60_000).toISOString(),
+      })
+      .eq('id', job.id),
+  ])
+
+  const persistenceErrors = [linkUpdate.error?.code, outboxUpdate.error?.code].filter(Boolean)
+  if (persistenceErrors.length > 0) {
+    console.error('Unable to persist failed outbox job', {
+      jobId: job.id,
+      errorCodes: persistenceErrors,
+    })
+  }
+}
+
+function assertDatabaseUpdate(error: { code?: string } | null, context: string) {
+  if (error) throw new Error(`${context}: ${error.code ?? 'unknown'}`)
+}
 
 async function getGoogleAccessToken(): Promise<string> {
   const serviceAccountEmail = required('GOOGLE_SERVICE_ACCOUNT_EMAIL')

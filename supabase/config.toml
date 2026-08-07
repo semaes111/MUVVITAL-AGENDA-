@@ -1,0 +1,7 @@
+project_id = "muvvital-agenda"
+
+# This endpoint is invoked by a scheduler with CRON_SECRET, not with a user JWT.
+# JWT verification must therefore be disabled at the gateway and enforced by
+# the constant endpoint secret checked inside the function.
+[functions.sync-google-calendar]
+verify_jwt = false

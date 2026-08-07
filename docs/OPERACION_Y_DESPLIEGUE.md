@@ -6,12 +6,12 @@ El repositorio puede arrancar en modo demostración sin credenciales. No se ha c
 
 Antes de conectar producción:
 
-1. realizar una auditoría de solo lectura del proyecto existente;
+1. ejecutar `supabase/audit/00_preflight_read_only.sql` en el proyecto existente;
 2. comprobar colisiones de objetos, versión PostgreSQL, extensiones, RLS, Auth, Realtime y consumidores actuales;
 3. hacer copia de seguridad y definir rollback;
 4. revisar la migración `supabase/migrations/20260807010418_init_agenda.sql`;
 5. obtener autorización expresa para aplicarla;
-6. ejecutar los advisors de seguridad y rendimiento después de aplicarla;
+6. ejecutar `supabase/audit/01_postdeploy_verification.sql` y los advisors de seguridad y rendimiento después de aplicarla;
 7. probar concurrencia y RLS con usuarios reales, nunca solo como `postgres` o con clave secreta.
 
 Todos los objetos de esta aplicación usan el prefijo `agenda_` y las funciones privilegiadas viven en `muvvital_agenda_private` para reducir el riesgo de colisión dentro del proyecto compartido.
@@ -50,15 +50,21 @@ Configurar en el proyecto existente:
 La función `sync-google-calendar` consume el outbox de forma asíncrona. Requiere estos secretos de backend:
 
 - `SUPABASE_URL`;
-- `SUPABASE_SECRET_KEY`;
+- `SUPABASE_SECRET_KEYS`, inyectado automáticamente por Supabase en el formato vigente;
 - `GOOGLE_SERVICE_ACCOUNT_EMAIL`;
 - `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`;
 - `GOOGLE_CALENDAR_ID`;
 - `CRON_SECRET`.
 
+Para despliegues antiguos se admite `SUPABASE_SERVICE_ROLE_KEY`; para pruebas locales controladas también puede definirse `SUPABASE_SECRET_KEY`. Ninguna de estas claves debe entrar en variables `VITE_*`, imágenes Docker, logs o Git.
+
+`supabase/config.toml` desactiva `verify_jwt` únicamente para este worker porque el programador no envía un JWT de usuario. El handler rechaza cualquier petición que no presente `CRON_SECRET` en `Authorization: Bearer ...`.
+
 Crear un calendario secundario de MÜV Vital, compartirlo con permiso de escritura con la cuenta técnica y conceder lectura a los profesionales. La cuenta técnica no necesita delegación de dominio si el calendario concreto se comparte directamente con ella.
 
 La función genera IDs deterministas base32hex, reintenta con backoff y nunca incluye datos de pacientes. La agenda PostgreSQL continúa siendo válida aunque Google esté caído.
+
+El claim del outbox serializa los trabajos pendientes de una misma reserva y recupera locks abandonados tras diez minutos. El tiempo máximo de ejecución del worker debe permanecer por debajo de ese lease.
 
 ## Dokploy
 

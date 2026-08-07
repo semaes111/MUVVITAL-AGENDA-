@@ -35,6 +35,12 @@ describe('contrato de seguridad y concurrencia del esquema', () => {
     expect(sql).not.toMatch(/using\s*\(\s*true\s*\)/i)
   })
 
+  it('garantiza una única membresía activa por identidad', () => {
+    expect(sql).toMatch(
+      /create unique index agenda_members_one_active_membership_idx[\s\S]+on public\.agenda_members\(user_id\)[\s\S]+where is_active/,
+    )
+  })
+
   it('mantiene las funciones privilegiadas fuera del esquema expuesto', () => {
     expect(sql).toContain('create schema if not exists muvvital_agenda_private')
     expect(sql).toContain('security definer')
@@ -45,6 +51,15 @@ describe('contrato de seguridad y concurrencia del esquema', () => {
   it('usa cancelación lógica y no borra reservas', () => {
     expect(sql).toContain("set status = 'cancelled'")
     expect(sql).not.toMatch(/delete\s+from\s+public\.agenda_bookings/i)
+  })
+
+  it('recupera trabajos abandonados y conserva el orden por reserva', () => {
+    expect(sql).toContain("stale.locked_at < now() - interval '10 minutes'")
+    expect(sql).toContain("last_error = 'Worker lease expired before completion'")
+    expect(sql).toMatch(
+      /earlier\.booking_id = outbox\.booking_id[\s\S]+earlier\.id < outbox\.id[\s\S]+earlier\.status in \('pending', 'processing', 'failed'\)/,
+    )
+    expect(sql).toContain('agenda_integration_outbox_lock_consistency')
   })
 
   it('no incluye secretos ni campos de pacientes', () => {
