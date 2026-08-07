@@ -31,6 +31,7 @@ describe('contrato del worker de Google Calendar', () => {
     expect(edgeFunction).toContain(
       "assertDatabaseUpdate(outboxUpdate.error, 'Outbox completion failed')",
     )
+    expect(edgeFunction).toContain('Math.min(job.attempts + 1, 2_147_483_647)')
   })
 
   it('desactiva la verificación JWT del gateway y autentica dentro del handler', () => {

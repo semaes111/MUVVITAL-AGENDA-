@@ -60,6 +60,24 @@ describe('contrato de seguridad y concurrencia del esquema', () => {
       /earlier\.booking_id = outbox\.booking_id[\s\S]+earlier\.id < outbox\.id[\s\S]+earlier\.status in \('pending', 'processing', 'failed'\)/,
     )
     expect(sql).toContain('agenda_integration_outbox_lock_consistency')
+    expect(sql).toContain('if p_limit is null or p_limit < 1 or p_limit > 100 then')
+    expect(sql).toContain('attempts integer not null default 0')
+  })
+
+  it('valida por completo los intervalos recibidos por RPC', () => {
+    expect(sql).toContain('if p_starts_at is null or p_ends_at is null then')
+    expect(sql).toContain('extract(second from local_start) <> 0')
+    expect(sql).toContain("if p_kind is distinct from 'ad_hoc' then")
+  })
+
+  it('reduce service_role a los privilegios estrictamente necesarios', () => {
+    expect(sql).toContain(
+      'revoke all on table public.agenda_organizations from anon, authenticated, service_role;',
+    )
+    expect(sql).toContain(
+      'grant select, update on table public.agenda_integration_outbox to service_role;',
+    )
+    expect(sql).not.toMatch(/grant all[^;]+service_role/i)
   })
 
   it('no incluye secretos ni campos de pacientes', () => {

@@ -153,7 +153,7 @@ async function markJobFailed(
   caught: unknown,
 ) {
   const message = safeError(caught)
-  const attempts = job.attempts + 1
+  const attempts = Math.min(job.attempts + 1, 2_147_483_647)
   const delayMinutes = Math.min(360, 2 ** Math.min(attempts, 8))
   const [linkUpdate, outboxUpdate] = await Promise.all([
     supabase

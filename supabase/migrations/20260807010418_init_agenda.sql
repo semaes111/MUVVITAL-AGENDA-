@@ -256,7 +256,7 @@ create table public.agenda_integration_outbox (
   action text not null check (action in ('upsert', 'cancel')),
   payload jsonb not null,
   status text not null default 'pending' check (status in ('pending', 'processing', 'completed', 'failed')),
-  attempts smallint not null default 0 check (attempts >= 0),
+  attempts integer not null default 0 check (attempts >= 0),
   available_at timestamptz not null default now(),
   locked_at timestamptz,
   last_error text,
@@ -469,6 +469,9 @@ declare
   start_minute_of_day integer;
   end_minute_of_day integer;
 begin
+  if p_starts_at is null or p_ends_at is null then
+    raise exception using errcode = '22004', message = 'Las horas de inicio y fin son obligatorias';
+  end if;
   select * into organization_record
   from public.agenda_organizations
   where id = p_organization_id;
@@ -493,6 +496,10 @@ begin
   end if;
   if local_end::time > organization_record.closes_at then
     raise exception using errcode = '22023', message = 'Fin posterior al horario de cierre';
+  end if;
+  if extract(second from local_start) <> 0
+    or extract(second from local_end) <> 0 then
+    raise exception using errcode = '22023', message = 'Las horas deben expresarse sin segundos';
   end if;
 
   duration_minutes := extract(epoch from (p_ends_at - p_starts_at))::integer / 60;
@@ -534,7 +541,7 @@ begin
   if actor_id is null then
     raise exception using errcode = '42501', message = 'Autenticación requerida';
   end if;
-  if p_kind <> 'ad_hoc' then
+  if p_kind is distinct from 'ad_hoc' then
     raise exception using errcode = '22023', message = 'Los turnos fijos se crean desde coordinación';
   end if;
 
@@ -798,7 +805,10 @@ begin
   from auth.users
   where id = actor_id
     and email_confirmed_at is not null
-    and raw_app_meta_data ->> 'provider' = 'google';
+    and (
+      raw_app_meta_data ->> 'provider' = 'google'
+      or coalesce(raw_app_meta_data -> 'providers', '[]'::jsonb) ? 'google'
+    );
   if auth_email is null then
     return false;
   end if;
@@ -901,7 +911,7 @@ returns table (
   booking_id uuid,
   action text,
   payload jsonb,
-  attempts smallint
+  attempts integer
 )
 language plpgsql
 volatile
@@ -909,7 +919,7 @@ security invoker
 set search_path = pg_catalog
 as $$
 begin
-  if p_limit < 1 or p_limit > 100 then
+  if p_limit is null or p_limit < 1 or p_limit > 100 then
     raise exception using errcode = '22023', message = 'El lote debe contener entre 1 y 100 trabajos';
   end if;
 
@@ -918,7 +928,10 @@ begin
   update public.agenda_integration_outbox as stale
   set
     status = 'failed',
-    attempts = least(stale.attempts + 1, 32767)::smallint,
+    attempts = case
+      when stale.attempts < 2147483647 then stale.attempts + 1
+      else stale.attempts
+    end,
     available_at = now(),
     locked_at = null,
     last_error = 'Worker lease expired before completion'
@@ -1008,20 +1021,22 @@ left join public.agenda_calendar_event_links as link
   on link.booking_id = booking.id
  and link.organization_id = booking.organization_id;
 
-revoke all on table public.agenda_organizations from anon, authenticated;
-revoke all on table public.agenda_rooms from anon, authenticated;
-revoke all on table public.agenda_booking_units from anon, authenticated;
-revoke all on table public.agenda_booking_unit_rooms from anon, authenticated;
-revoke all on table public.agenda_members from anon, authenticated;
-revoke all on table public.agenda_member_invitations from anon, authenticated;
-revoke all on table public.agenda_booking_series from anon, authenticated;
-revoke all on table public.agenda_bookings from anon, authenticated;
-revoke all on table public.agenda_room_occupancies from anon, authenticated;
-revoke all on table public.agenda_booking_audit from anon, authenticated;
-revoke all on table public.agenda_calendar_event_links from anon, authenticated;
-revoke all on table public.agenda_integration_outbox from anon, authenticated;
-revoke all on table public.agenda_booking_unit_directory from anon, authenticated;
-revoke all on table public.agenda_booking_calendar from anon, authenticated;
+revoke all on table public.agenda_organizations from anon, authenticated, service_role;
+revoke all on table public.agenda_rooms from anon, authenticated, service_role;
+revoke all on table public.agenda_booking_units from anon, authenticated, service_role;
+revoke all on table public.agenda_booking_unit_rooms from anon, authenticated, service_role;
+revoke all on table public.agenda_members from anon, authenticated, service_role;
+revoke all on table public.agenda_member_invitations from anon, authenticated, service_role;
+revoke all on table public.agenda_booking_series from anon, authenticated, service_role;
+revoke all on table public.agenda_bookings from anon, authenticated, service_role;
+revoke all on table public.agenda_room_occupancies from anon, authenticated, service_role;
+revoke all on table public.agenda_booking_audit from anon, authenticated, service_role;
+revoke all on table public.agenda_calendar_event_links from anon, authenticated, service_role;
+revoke all on table public.agenda_integration_outbox from anon, authenticated, service_role;
+revoke all on table public.agenda_booking_unit_directory from anon, authenticated, service_role;
+revoke all on table public.agenda_booking_calendar from anon, authenticated, service_role;
+revoke all on sequence public.agenda_booking_audit_id_seq from anon, authenticated, service_role;
+revoke all on sequence public.agenda_integration_outbox_id_seq from anon, authenticated, service_role;
 
 grant select on table public.agenda_organizations to authenticated;
 grant select on table public.agenda_rooms to authenticated;
@@ -1055,7 +1070,8 @@ grant select, update on table public.agenda_calendar_event_links to service_role
 grant select, update on table public.agenda_integration_outbox to service_role;
 
 grant usage on schema muvvital_agenda_private to authenticated;
-revoke all on all functions in schema muvvital_agenda_private from public, anon;
+revoke all on all functions in schema muvvital_agenda_private
+  from public, anon, authenticated, service_role;
 grant execute on function muvvital_agenda_private.is_active_member(uuid) to authenticated;
 grant execute on function muvvital_agenda_private.is_coordinator(uuid) to authenticated;
 grant execute on function muvvital_agenda_private.create_booking(uuid, timestamptz, timestamptz, text) to authenticated;
