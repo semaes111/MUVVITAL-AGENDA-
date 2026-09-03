@@ -1,0 +1,16 @@
+ENTREGA · AUDITORÍA MUVVITAL-AGENDA · run TÁNDEM 69118bee · 3 de septiembre de 2026
+NextHorizont AI · TÁNDEM
+
+Origen: https://github.com/semaes111/MUVVITAL-AGENDA- @ 1ecfd97ec12c (repo privado; clon de solo lectura)
+
+01-informe-ejecutivo.pdf   Qué es, resultado en una frase, cifras del embudo, déficits por prioridad, siguiente paso.
+02-dossier-consenso.pdf    Documento íntegro consolidado (359 líneas): vivo/apagado/no comisionado/averiado, calidad y
+                           seguridad, 10 déficits C1–C10 con impacto, corrección y prueba de aceptación, 6 sobreclaims,
+                           preguntas cerradas y abiertas, 5 contradicciones nombradas, qué falta para producción,
+                           huecos declarados, anexo de la aportación de glm.
+03-hoja-de-firma.pdf       Decisión por línea (acepto / rechazo / pospongo) sobre cada déficit, techo de confianza,
+                           contradicciones, qué falta y huecos. Firma.
+
+Las versiones .md son las fuentes de los PDF. Método: dossier por bloques (1 módulo) con trío multi-agente
+(Claude Code · Codex · glm), cierre por quórum, juez independiente DeepSeek (Condición A) y consolidación incremental.
+Techo de confianza: ningún [MEDIDO] procede de ejecución; todo procede de lectura de la línea citada.
