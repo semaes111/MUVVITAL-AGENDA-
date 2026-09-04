@@ -6,6 +6,8 @@
 
 **Garantía multi-agente en la consolidación.** El candidato `glm` declaró «entrada vacía» en la ronda de consolidación (anexo §10 del dossier): la síntesis final descansa en el candidato `claude` sobre el informe sellado B1, que sí tuvo tres agentes y juez. Queda registrado como CT-5 y como incidencia del producto en investigación.
 
+**Nota de honestidad (4 de septiembre de 2026, tras el gate P0 de TÁNDEM v0.7.21).** En este run el agente api (glm) **no recibió el worktree** en la fase PRODUCE por un defecto del producto (el prompt solo llevaba el encargo); sus candidatos fueron ciegos y quedó degradado o expulsado con razón. Las críticas cruzadas, la adjudicación del juez independiente y los votos no estaban afectados. En consecuencia, la garantía real de este dossier es **dos agentes CLI (Claude Code y Codex) con juez independiente (DeepSeek)**, no tres agentes. El defecto está corregido y acreditado con regresión; los dossieres posteriores a v0.7.21 llevan los tres. Esta nota forma parte de lo que firmas.
+
 ## Déficits consolidados — decisión por línea
 
 | # | Prioridad | Déficit | Decisión |
